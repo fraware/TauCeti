@@ -8,7 +8,9 @@ module
 public import TauCeti.Topology.MetricSpace.TotallyBounded
 public import Mathlib.Analysis.Calculus.BumpFunction.Convolution
 public import Mathlib.Analysis.Calculus.ContDiff.Convolution
+public import Mathlib.MeasureTheory.Function.L2Space
 public import Mathlib.MeasureTheory.Function.LpSpace.ContinuousCompMeasurePreserving
+public import Mathlib.MeasureTheory.Measure.Lebesgue.EqHaar
 public import Mathlib.Topology.ContinuousMap.Bounded.ArzelaAscoli
 
 /-!
@@ -29,6 +31,10 @@ The global `L²` bound on representatives is load-bearing: a bound only on one f
 with a translation modulus does not control mass in the annulus reached by the mollifier.  This
 module therefore does not claim that local boundedness plus translation continuity alone implies
 compactness.
+
+The measure is the canonical `volume` on a finite-dimensional real inner-product space.  This is
+the setting needed by the PDE roadmap and avoids introducing irrelevant Haar-measure parameters
+into the eventual compactness API.
 
 ## Provenance
 
@@ -54,62 +60,64 @@ open Filter MeasureTheory Set
 open scoped Convolution ENNReal Topology
 
 variable {E : Type*} [MeasurableSpace E] [NormedAddCommGroup E] [InnerProductSpace ℝ E]
-  [FiniteDimensional ℝ E] [BorelSpace E] {mu : Measure E} [mu.IsAddHaarMeasure]
+  [FiniteDimensional ℝ E] [BorelSpace E]
 
 /-! ### Restricted `L²` classes and translations -/
 
-/-- Restrict a whole-space `L²` class to a measurable or nonmeasurable set by changing the
-underlying measure to `μ.restrict s`.  This is implementation plumbing for the compactness proof;
-the public criterion is stated directly in terms of almost-everywhere representatives. -/
-private noncomputable def restrictL2 (s : Set E) (f : Lp ℝ 2 mu) :
-    Lp ℝ 2 (mu.restrict s) :=
+/-- Restrict a whole-space `L²` class to a set by changing the underlying measure to
+`volume.restrict s`.  This is implementation plumbing for the compactness proof; the public
+criterion will expose only the compactness property that later PDE arguments consume. -/
+private noncomputable def restrictL2 (s : Set E) (f : Lp ℝ 2 (volume : Measure E)) :
+    Lp ℝ 2 ((volume : Measure E).restrict s) :=
   ((Lp.memLp f).restrict s).toLp _
 
-private theorem coeFn_restrictL2 (s : Set E) (f : Lp ℝ 2 mu) :
-    (restrictL2 (mu := mu) s f : E → ℝ) =ᵐ[mu.restrict s] (f : E → ℝ) :=
+private theorem coeFn_restrictL2 (s : Set E) (f : Lp ℝ 2 (volume : Measure E)) :
+    (restrictL2 s f : E → ℝ) =ᵐ[(volume : Measure E).restrict s] (f : E → ℝ) :=
   MemLp.coeFn_toLp _
 
 /-- Restriction cannot increase the `L²` norm. -/
-private theorem norm_restrictL2_le (s : Set E) (f : Lp ℝ 2 mu) :
-    ‖restrictL2 (mu := mu) s f‖ ≤ ‖f‖ := by
+private theorem norm_restrictL2_le (s : Set E) (f : Lp ℝ 2 (volume : Measure E)) :
+    ‖restrictL2 s f‖ ≤ ‖f‖ := by
   rw [restrictL2, Lp.norm_toLp, Lp.norm_def]
   refine ENNReal.toReal_mono (Lp.memLp f).2.ne ?_
   exact eLpNorm_mono_measure _ Measure.restrict_le_self
 
 /-- Whole-space `L²` translation by `h`, represented by `x ↦ f (x + h)`. -/
-private noncomputable def translateL2 (h : E) (f : Lp ℝ 2 mu) : Lp ℝ 2 mu :=
-  Lp.compMeasurePreserving (· + h) (measurePreserving_add_right mu h) f
+private noncomputable def translateL2 (h : E) (f : Lp ℝ 2 (volume : Measure E)) :
+    Lp ℝ 2 (volume : Measure E) :=
+  Lp.compMeasurePreserving (· + h)
+    (measurePreserving_add_right (volume : Measure E) h) f
 
-private theorem coeFn_translateL2 (h : E) (f : Lp ℝ 2 mu) :
-    (translateL2 (mu := mu) h f : E → ℝ) =ᵐ[mu] fun x => f (x + h) :=
-  Lp.coeFn_compMeasurePreserving f (measurePreserving_add_right mu h)
+private theorem coeFn_translateL2 (h : E) (f : Lp ℝ 2 (volume : Measure E)) :
+    (translateL2 h f : E → ℝ) =ᵐ[volume] fun x => f (x + h) :=
+  Lp.coeFn_compMeasurePreserving f (measurePreserving_add_right (volume : Measure E) h)
 
 /-- Translation of a fixed `L²` class is continuous in the shift. -/
-private theorem continuous_translateL2 (f : Lp ℝ 2 mu) :
-    Continuous fun h : E => translateL2 (mu := mu) h f := by
+private theorem continuous_translateL2 (f : Lp ℝ 2 (volume : Measure E)) :
+    Continuous fun h : E => translateL2 h f := by
   let g : E → C(E, E) := fun h => ⟨(· + h), continuous_id.add continuous_const⟩
   have hg : Continuous g := by
     refine ContinuousMap.continuous_of_continuous_uncurry _ ?_
     show Continuous (fun p : E × E => p.2 + p.1)
     exact continuous_snd.add continuous_fst
-  have hgm : ∀ h : E, MeasurePreserving (g h) mu mu := fun h =>
-    measurePreserving_add_right mu h
+  have hgm : ∀ h : E, MeasurePreserving (g h) (volume : Measure E) volume := fun h =>
+    measurePreserving_add_right (volume : Measure E) h
   have hcont := Continuous.compMeasurePreservingLp
-    (mu := mu) (nu := mu) (E := ℝ) (p := 2)
+    (μ := (volume : Measure E)) (ν := (volume : Measure E)) (E := ℝ) (p := 2)
     (f := fun _ : E => f) (g := g) continuous_const hg hgm (by simp)
   simpa [translateL2, g] using hcont
 
 @[simp]
-private theorem translateL2_zero (f : Lp ℝ 2 mu) : translateL2 (mu := mu) 0 f = f := by
+private theorem translateL2_zero (f : Lp ℝ 2 (volume : Measure E)) : translateL2 0 f = f := by
   refine Lp.ext ?_
-  filter_upwards [coeFn_translateL2 (mu := mu) (0 : E) f] with x hx
+  filter_upwards [coeFn_translateL2 (0 : E) f] with x hx
   simpa using hx
 
 /-- The `L²` translation modulus of a fixed class vanishes at the origin. -/
-private theorem tendsto_norm_translateL2_sub (f : Lp ℝ 2 mu) :
-    Tendsto (fun h : E => ‖translateL2 (mu := mu) h f - f‖) (𝓝 0) (𝓝 0) := by
-  have hsub : Continuous fun h : E => translateL2 (mu := mu) h f - f :=
-    (continuous_translateL2 (mu := mu) f).sub continuous_const
+private theorem tendsto_norm_translateL2_sub (f : Lp ℝ 2 (volume : Measure E)) :
+    Tendsto (fun h : E => ‖translateL2 h f - f‖) (𝓝 0) (𝓝 0) := by
+  have hsub : Continuous fun h : E => translateL2 h f - f :=
+    (continuous_translateL2 f).sub continuous_const
   have hnorm := hsub.norm.tendsto 0
   simpa using hnorm
 
@@ -124,51 +132,50 @@ private noncomputable def frechetKolmogorovBump (r : ℝ) (hr : 0 < r) : ContDif
 
 /-- The normalized nonnegative mollifier associated to `frechetKolmogorovBump`. -/
 private noncomputable def frechetKolmogorovKernel (r : ℝ) (hr : 0 < r) : E → ℝ :=
-  (frechetKolmogorovBump (E := E) r hr).normed mu
+  (frechetKolmogorovBump (E := E) r hr).normed (volume : Measure E)
 
 private theorem contDiff_frechetKolmogorovKernel (r : ℝ) (hr : 0 < r) :
-    ContDiff ℝ ∞ (frechetKolmogorovKernel (E := E) (mu := mu) r hr) :=
+    ContDiff ℝ ∞ (frechetKolmogorovKernel (E := E) r hr) :=
   (frechetKolmogorovBump (E := E) r hr).contDiff_normed
 
 private theorem hasCompactSupport_frechetKolmogorovKernel (r : ℝ) (hr : 0 < r) :
-    HasCompactSupport (frechetKolmogorovKernel (E := E) (mu := mu) r hr) :=
+    HasCompactSupport (frechetKolmogorovKernel (E := E) r hr) :=
   (frechetKolmogorovBump (E := E) r hr).hasCompactSupport_normed
 
 private theorem frechetKolmogorovKernel_nonneg (r : ℝ) (hr : 0 < r) (x : E) :
-    0 ≤ frechetKolmogorovKernel (E := E) (mu := mu) r hr x :=
+    0 ≤ frechetKolmogorovKernel (E := E) r hr x :=
   (frechetKolmogorovBump (E := E) r hr).nonneg_normed x
 
 private theorem integral_frechetKolmogorovKernel (r : ℝ) (hr : 0 < r) :
-    ∫ x : E, frechetKolmogorovKernel (E := E) (mu := mu) r hr x ∂mu = 1 :=
+    ∫ x : E, frechetKolmogorovKernel (E := E) r hr x ∂volume = 1 :=
   (frechetKolmogorovBump (E := E) r hr).integral_normed
 
 private theorem tsupport_frechetKolmogorovKernel (r : ℝ) (hr : 0 < r) :
-    tsupport (frechetKolmogorovKernel (E := E) (mu := mu) r hr) =
+    tsupport (frechetKolmogorovKernel (E := E) r hr) =
       Metric.closedBall (0 : E) (r / 2) := by
   exact (frechetKolmogorovBump (E := E) r hr).tsupport_normed_eq
 
 private theorem frechetKolmogorovKernel_even (r : ℝ) (hr : 0 < r) (x : E) :
-    frechetKolmogorovKernel (E := E) (mu := mu) r hr (-x) =
-      frechetKolmogorovKernel (E := E) (mu := mu) r hr x :=
+    frechetKolmogorovKernel (E := E) r hr (-x) =
+      frechetKolmogorovKernel (E := E) r hr x :=
   (frechetKolmogorovBump (E := E) r hr).normed_neg x
 
 /-- The mollifier as an `L²` class. -/
-private noncomputable def frechetKolmogorovKernelL2 (r : ℝ) (hr : 0 < r) : Lp ℝ 2 mu :=
-  (contDiff_frechetKolmogorovKernel (E := E) (mu := mu) r hr).continuous
+private noncomputable def frechetKolmogorovKernelL2 (r : ℝ) (hr : 0 < r) :
+    Lp ℝ 2 (volume : Measure E) :=
+  (contDiff_frechetKolmogorovKernel (E := E) r hr).continuous
     |>.memLp_of_hasCompactSupport
-      (hasCompactSupport_frechetKolmogorovKernel (E := E) (mu := mu) r hr)
+      (hasCompactSupport_frechetKolmogorovKernel (E := E) r hr)
     |>.toLp _
 
 /-- The mollifier's own `L²` translation modulus vanishes. -/
 private theorem tendsto_norm_translate_frechetKolmogorovKernelL2_sub (r : ℝ) (hr : 0 < r) :
     Tendsto
       (fun h : E =>
-        ‖translateL2 (mu := mu) h
-            (frechetKolmogorovKernelL2 (E := E) (mu := mu) r hr) -
-          frechetKolmogorovKernelL2 (E := E) (mu := mu) r hr‖)
+        ‖translateL2 h (frechetKolmogorovKernelL2 (E := E) r hr) -
+          frechetKolmogorovKernelL2 (E := E) r hr‖)
       (𝓝 0) (𝓝 0) :=
-  tendsto_norm_translateL2_sub
-    (frechetKolmogorovKernelL2 (E := E) (mu := mu) r hr)
+  tendsto_norm_translateL2_sub (frechetKolmogorovKernelL2 (E := E) r hr)
 
 /-! ### Pointwise mollification -/
 
@@ -177,17 +184,17 @@ The `L²` function is placed on the left and the compactly supported smooth kern
 that both the pointwise formula `∫ y, f y * η (x - y)` and Mathlib's convolution-regularity API
 line up directly. -/
 private noncomputable def frechetKolmogorovMollify (r : ℝ) (hr : 0 < r)
-    (f : Lp ℝ 2 mu) : E → ℝ :=
-  (f : E → ℝ) ⋆[ContinuousLinearMap.lsmul ℝ ℝ, mu]
-    frechetKolmogorovKernel (E := E) (mu := mu) r hr
+    (f : Lp ℝ 2 (volume : Measure E)) : E → ℝ :=
+  (f : E → ℝ) ⋆[ContinuousLinearMap.lsmul ℝ ℝ, volume]
+    frechetKolmogorovKernel (E := E) r hr
 
 /-- Mollification of an `L²` function by the normalized bump is smooth. -/
 private theorem contDiff_frechetKolmogorovMollify (r : ℝ) (hr : 0 < r)
-    (f : Lp ℝ 2 mu) :
-    ContDiff ℝ ∞ (frechetKolmogorovMollify (E := E) (mu := mu) r hr f) := by
-  exact (hasCompactSupport_frechetKolmogorovKernel (E := E) (mu := mu) r hr).contDiff_convolution_right
+    (f : Lp ℝ 2 (volume : Measure E)) :
+    ContDiff ℝ ∞ (frechetKolmogorovMollify (E := E) r hr f) := by
+  exact (hasCompactSupport_frechetKolmogorovKernel (E := E) r hr).contDiff_convolution_right
     (ContinuousLinearMap.lsmul ℝ ℝ)
     ((Lp.memLp f).locallyIntegrable (by norm_num))
-    (contDiff_frechetKolmogorovKernel (E := E) (mu := mu) r hr)
+    (contDiff_frechetKolmogorovKernel (E := E) r hr)
 
 end TauCeti
