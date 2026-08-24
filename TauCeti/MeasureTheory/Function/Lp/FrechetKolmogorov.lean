@@ -429,4 +429,69 @@ private theorem norm_frechetKolmogorovMollify_sub_le (r : ℝ) (hr : 0 < r)
         ‖translateL2 (x - y) (frechetKolmogorovKernelL2 (E := E) r hr) -
           frechetKolmogorovKernelL2 (E := E) r hr‖ := by rw [hna, hnb, mul_comm]
 
+/-! ### Uniform bounds for a mollified family -/
+
+/-- A globally `L²`-bounded family has a common pointwise bound after mollification. -/
+private theorem mollified_family_uniformly_bounded (r : ℝ) (hr : 0 < r) (C : ℝ)
+    (S : Set (Lp ℝ 2 (volume : Measure E))) (hbd : ∀ f ∈ S, ‖f‖ ≤ C) :
+    ∃ B : ℝ, ∀ f ∈ S, ∀ x : E,
+      ‖frechetKolmogorovMollify (E := E) r hr f x‖ ≤ B := by
+  refine ⟨‖frechetKolmogorovKernelL2 (E := E) r hr‖ * max C 0, fun f hf x => ?_⟩
+  calc
+    ‖frechetKolmogorovMollify (E := E) r hr f x‖
+        ≤ ‖frechetKolmogorovKernelL2 (E := E) r hr‖ * ‖f‖ :=
+      norm_frechetKolmogorovMollify_le (E := E) r hr f x
+    _ ≤ ‖frechetKolmogorovKernelL2 (E := E) r hr‖ * max C 0 :=
+      mul_le_mul_of_nonneg_left ((hbd f hf).trans (le_max_left C 0)) (norm_nonneg _)
+
+/-- A globally `L²`-bounded family is uniformly equicontinuous after mollification.  The modulus is
+controlled solely by the common `L²` bound and the kernel's own `L²` translation modulus. -/
+private theorem mollified_family_equicontinuous (r : ℝ) (hr : 0 < r) (C : ℝ)
+    (S : Set (Lp ℝ 2 (volume : Measure E))) (hbd : ∀ f ∈ S, ‖f‖ ≤ C) :
+    ∀ ε > 0, ∃ δ > 0, ∀ f ∈ S, ∀ x y : E, ‖x - y‖ < δ →
+      ‖frechetKolmogorovMollify (E := E) r hr f x -
+        frechetKolmogorovMollify (E := E) r hr f y‖ < ε := by
+  intro ε hε
+  set M : ℝ := max C 0 + 1 with hM
+  have hMpos : 0 < M := by positivity
+  have htend := tendsto_norm_translate_frechetKolmogorovKernelL2_sub (E := E) r hr
+  have hpos : 0 < ε / M := div_pos hε hMpos
+  have hball : {z : ℝ | z < ε / M} ∈ 𝓝 (0 : ℝ) :=
+    IsOpen.mem_nhds isOpen_Iio (by simpa using hpos)
+  have hpre :
+      (fun h : E =>
+        ‖translateL2 h (frechetKolmogorovKernelL2 (E := E) r hr) -
+          frechetKolmogorovKernelL2 (E := E) r hr‖) ⁻¹' {z : ℝ | z < ε / M} ∈
+        𝓝 (0 : E) := htend hball
+  rw [Metric.mem_nhds_iff] at hpre
+  obtain ⟨δ, hδpos, hδsub⟩ := hpre
+  refine ⟨δ, hδpos, fun f hf x y hxy => ?_⟩
+  have hmem : x - y ∈ Metric.ball (0 : E) δ := by
+    simp only [Metric.mem_ball, dist_zero_right]
+    simpa using hxy
+  have hmod_lt :
+      ‖translateL2 (x - y) (frechetKolmogorovKernelL2 (E := E) r hr) -
+        frechetKolmogorovKernelL2 (E := E) r hr‖ < ε / M :=
+    hδsub hmem
+  have hmod_nonneg : 0 ≤
+      ‖translateL2 (x - y) (frechetKolmogorovKernelL2 (E := E) r hr) -
+        frechetKolmogorovKernelL2 (E := E) r hr‖ := norm_nonneg _
+  have hCM : C ≤ M := by
+    rw [hM]
+    linarith [le_max_left C 0]
+  have hmass : ‖f‖ ≤ M := (hbd f hf).trans hCM
+  calc
+    ‖frechetKolmogorovMollify (E := E) r hr f x -
+        frechetKolmogorovMollify (E := E) r hr f y‖
+        ≤ ‖f‖ *
+          ‖translateL2 (x - y) (frechetKolmogorovKernelL2 (E := E) r hr) -
+            frechetKolmogorovKernelL2 (E := E) r hr‖ :=
+      norm_frechetKolmogorovMollify_sub_le (E := E) r hr f x y
+    _ ≤ M *
+          ‖translateL2 (x - y) (frechetKolmogorovKernelL2 (E := E) r hr) -
+            frechetKolmogorovKernelL2 (E := E) r hr‖ :=
+      mul_le_mul_of_nonneg_right hmass hmod_nonneg
+    _ < M * (ε / M) := mul_lt_mul_of_pos_left hmod_lt hMpos
+    _ = ε := by field_simp
+
 end TauCeti
