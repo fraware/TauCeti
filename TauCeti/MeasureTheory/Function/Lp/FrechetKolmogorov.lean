@@ -172,19 +172,22 @@ private theorem tendsto_norm_translate_frechetKolmogorovKernelL2_sub (r : ℝ) (
 
 /-! ### Pointwise mollification -/
 
-/-- Pointwise convolution of the normalized kernel with a whole-space `L²` representative. -/
+/-- Pointwise convolution of a whole-space `L²` representative with the normalized smooth kernel.
+The `L²` function is placed on the left and the compactly supported smooth kernel on the right so
+that both the pointwise formula `∫ y, f y * η (x - y)` and Mathlib's convolution-regularity API
+line up directly. -/
 private noncomputable def frechetKolmogorovMollify (r : ℝ) (hr : 0 < r)
     (f : Lp ℝ 2 mu) : E → ℝ :=
-  frechetKolmogorovKernel (E := E) (mu := mu) r hr ⋆[ContinuousLinearMap.lsmul ℝ ℝ, mu]
-    (f : E → ℝ)
+  (f : E → ℝ) ⋆[ContinuousLinearMap.lsmul ℝ ℝ, mu]
+    frechetKolmogorovKernel (E := E) (mu := mu) r hr
 
 /-- Mollification of an `L²` function by the normalized bump is smooth. -/
 private theorem contDiff_frechetKolmogorovMollify (r : ℝ) (hr : 0 < r)
     (f : Lp ℝ 2 mu) :
     ContDiff ℝ ∞ (frechetKolmogorovMollify (E := E) (mu := mu) r hr f) := by
-  exact (hasCompactSupport_frechetKolmogorovKernel (E := E) (mu := mu) r hr).contDiff_convolution_left
+  exact (hasCompactSupport_frechetKolmogorovKernel (E := E) (mu := mu) r hr).contDiff_convolution_right
     (ContinuousLinearMap.lsmul ℝ ℝ)
-    (contDiff_frechetKolmogorovKernel (E := E) (mu := mu) r hr)
     ((Lp.memLp f).locallyIntegrable (by norm_num))
+    (contDiff_frechetKolmogorovKernel (E := E) (mu := mu) r hr)
 
 end TauCeti
