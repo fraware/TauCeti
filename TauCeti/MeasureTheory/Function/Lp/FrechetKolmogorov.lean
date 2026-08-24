@@ -197,4 +197,66 @@ private theorem contDiff_frechetKolmogorovMollify (r : ℝ) (hr : 0 < r)
     ((Lp.memLp f).locallyIntegrable (by norm_num))
     (contDiff_frechetKolmogorovKernel (E := E) r hr)
 
+/-- Global Cauchy--Schwarz bound for the pointwise mollification.  The estimate is valid at every
+point, not only on the compact ball used later by Arzelà--Ascoli. -/
+private theorem norm_frechetKolmogorovMollify_le (r : ℝ) (hr : 0 < r)
+    (f : Lp ℝ 2 (volume : Measure E)) (x : E) :
+    ‖frechetKolmogorovMollify (E := E) r hr f x‖ ≤
+      ‖frechetKolmogorovKernelL2 (E := E) r hr‖ * ‖f‖ := by
+  classical
+  have hηmem : MemLp (frechetKolmogorovKernel (E := E) r hr) 2 (volume : Measure E) :=
+    (contDiff_frechetKolmogorovKernel (E := E) r hr).continuous.memLp_of_hasCompactSupport
+      (hasCompactSupport_frechetKolmogorovKernel (E := E) r hr)
+  have hηaesm : AEStronglyMeasurable (frechetKolmogorovKernel (E := E) r hr)
+      (volume : Measure E) := hηmem.aestronglyMeasurable
+  have hmp := Measure.measurePreserving_sub_left (volume : Measure E) x
+  have ha : MemLp
+      (fun y : E => |frechetKolmogorovKernel (E := E) r hr (x - y)|) 2
+      (volume : Measure E) :=
+    (hηmem.comp_measurePreserving hmp).abs
+  have hb : MemLp (fun y : E => ‖(f : E → ℝ) y‖) 2 (volume : Measure E) :=
+    (Lp.memLp f).norm
+  have hstep : ‖frechetKolmogorovMollify (E := E) r hr f x‖ ≤
+      ∫ y : E, |frechetKolmogorovKernel (E := E) r hr (x - y)| * ‖(f : E → ℝ) y‖
+        ∂(volume : Measure E) := by
+    rw [frechetKolmogorovMollify, MeasureTheory.convolution]
+    refine le_trans (norm_integral_le_integral_norm _) (le_of_eq (integral_congr_ae ?_))
+    filter_upwards with y
+    simp only [ContinuousLinearMap.lsmul_apply, norm_smul, Real.norm_eq_abs]
+    ring
+  have hcs := real_inner_le_norm (ha.toLp _) (hb.toLp _)
+  rw [L2.inner_def] at hcs
+  have heq :
+      (∫ y : E, |frechetKolmogorovKernel (E := E) r hr (x - y)| * ‖(f : E → ℝ) y‖
+          ∂(volume : Measure E)) =
+        ∫ y : E, inner ℝ ((ha.toLp _ : E → ℝ) y) ((hb.toLp _ : E → ℝ) y)
+          ∂(volume : Measure E) := by
+    refine integral_congr_ae ?_
+    filter_upwards [ha.coeFn_toLp, hb.coeFn_toLp] with y hay hby
+    simp only [RCLike.inner_apply, conj_trivial]
+    rw [hay, hby, mul_comm]
+  have hna : ‖ha.toLp _‖ = ‖frechetKolmogorovKernelL2 (E := E) r hr‖ := by
+    rw [frechetKolmogorovKernelL2, Lp.norm_toLp, Lp.norm_toLp]
+    congr 1
+    have habs : AEStronglyMeasurable
+        (fun y : E => |frechetKolmogorovKernel (E := E) r hr y|) (volume : Measure E) :=
+      hηaesm.norm.congr (by filter_upwards with y using (Real.norm_eq_abs _))
+    rw [show (fun y : E => |frechetKolmogorovKernel (E := E) r hr (x - y)|) =
+        (fun y : E => |frechetKolmogorovKernel (E := E) r hr y|) ∘ (fun y => x - y) from rfl,
+      eLpNorm_comp_measurePreserving habs hmp]
+    rw [show (fun y : E => |frechetKolmogorovKernel (E := E) r hr y|) =
+        (fun y : E => ‖frechetKolmogorovKernel (E := E) r hr y‖) from
+          funext fun y => (Real.norm_eq_abs _).symm,
+      eLpNorm_norm]
+  have hnb : ‖hb.toLp _‖ = ‖f‖ := by
+    rw [Lp.norm_toLp, Lp.norm_def, ← eLpNorm_norm (f : E → ℝ)]
+  calc
+    ‖frechetKolmogorovMollify (E := E) r hr f x‖
+        ≤ ∫ y : E, |frechetKolmogorovKernel (E := E) r hr (x - y)| * ‖(f : E → ℝ) y‖
+            ∂(volume : Measure E) := hstep
+    _ = ∫ y : E, inner ℝ ((ha.toLp _ : E → ℝ) y) ((hb.toLp _ : E → ℝ) y)
+          ∂(volume : Measure E) := heq
+    _ ≤ ‖ha.toLp _‖ * ‖hb.toLp _‖ := hcs
+    _ = ‖frechetKolmogorovKernelL2 (E := E) r hr‖ * ‖f‖ := by rw [hna, hnb]
+
 end TauCeti
