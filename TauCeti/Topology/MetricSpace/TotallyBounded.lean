@@ -6,31 +6,35 @@ Authors: The Tau Ceti contributors
 module
 
 public import Mathlib.Topology.MetricSpace.Cover
+public import Mathlib.Topology.UniformSpace.Cauchy
 
 /-!
 # Total boundedness under uniform approximation
 
-This file records a small compactness lemma used by approximation arguments.  A subset of a
+This file records the topological compactness step used by approximation arguments. A subset of a
 pseudometric space is totally bounded if, at every positive scale, all of its points can be
-uniformly approximated at that scale by points of some totally bounded set.
+uniformly approximated at that scale by points of some totally bounded set. In a complete metric
+space, the closure of such a set is therefore compact.
 
-The statement is deliberately independent of function spaces, measures, or Sobolev theory.  In
-the Fréchet--Kolmogorov argument it is the final topological step: mollified functions form a
+The statements are deliberately independent of function spaces, measures, or Sobolev theory. In
+the Fréchet--Kolmogorov argument they are the final topological step: mollified functions form a
 totally bounded family, uniform approximation transfers total boundedness back to the original
-family, and completeness then upgrades the closure to a compact set.
+family, and completeness upgrades its closure to a compact set.
 
-## Main declaration
+## Main declarations
 
 * `TauCeti.totallyBounded_of_uniform_approx`: total boundedness transfers through uniformly
   arbitrarily accurate approximants.
+* `TauCeti.isCompact_closure_of_uniform_approx`: in a complete metric space, the same hypothesis
+  makes the closure compact.
 
 ## Provenance
 
-The proof is adapted from `uda-lab/leray-hopf` (Apache-2.0), commit
-`e704400f2fb2f26b2ee7f4372c3e1ecbbc82f3dc`,
-`LerayHopf/Bochner/StepFunctionCompactness.lean` (`totallyBounded_of_uniform_approx'`).  The
-statement is renamed and documented for Tau Ceti; the argument is the same finite-net triangle
-inequality proof.
+The finite-net proof of `TauCeti.totallyBounded_of_uniform_approx` is adapted from
+`uda-lab/leray-hopf` (Apache-2.0), commit `e704400f2fb2f26b2ee7f4372c3e1ecbbc82f3dc`,
+`LerayHopf/Bochner/StepFunctionCompactness.lean` (`totallyBounded_of_uniform_approx'`). The
+compact-closure corollary uses Mathlib's `TotallyBounded.closure` and
+`TotallyBounded.isCompact_of_isClosed` directly.
 -/
 
 public section
@@ -62,5 +66,14 @@ theorem totallyBounded_of_uniform_approx {α : Type*} [PseudoMetricSpace α] (S 
     dist s y ≤ dist s a + dist a y := dist_triangle s a y
     _ < ε / 2 + ε / 2 := by linarith
     _ = ε := by ring
+
+/-- In a complete metric space, uniform approximation by totally bounded sets makes the closure
+of the original set compact. -/
+theorem isCompact_closure_of_uniform_approx {α : Type*} [MetricSpace α] [CompleteSpace α]
+    (S : Set α)
+    (happrox : ∀ ε > 0, ∃ A : Set α, TotallyBounded A ∧
+      ∀ s ∈ S, ∃ a ∈ A, dist s a < ε) :
+    IsCompact (closure S) :=
+  (totallyBounded_of_uniform_approx S happrox).closure.isCompact_of_isClosed isClosed_closure
 
 end TauCeti
