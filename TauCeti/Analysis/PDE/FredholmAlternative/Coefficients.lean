@@ -6,6 +6,7 @@ Authors: The Tau Ceti contributors
 module
 
 public import TauCeti.Analysis.PDE.FredholmAlternative.Basic
+public import TauCeti.Analysis.PDE.EnergyForm.MassFloor
 
 /-!
 # The Fredholm alternative from coefficient bounds
@@ -93,6 +94,11 @@ private theorem mem_ker_one_sub_smul_dirichletMassOperator_iff_isWeakSolutionDir
       IsWeakSolutionDirichlet a b (fun x => c x + kappa) 0 (0 : W1p0 mu Omega 2) := by
     rw [isWeakSolutionDirichlet_iff]
     intro v
+    rw [energyFormH1_zero_left]
+    symm
+    apply integral_eq_zero_of_ae
+    filter_upwards [Lp.coeFn_zero (E := ℝ) (p := 2) (μ := mu.restrict Omega)] with x hx
+    rw [hx]
     simp
   have hzero : weakSolutionDirichlet hcoeffShift hcoercive 0 = 0 :=
     (eq_weakSolutionDirichlet hcoeffShift hcoercive hzeroSol).symm
@@ -164,41 +170,14 @@ theorem fredholmAlternative_isWeakSolutionDirichlet_of_bounds
     have hcge : -gamma ≤ c x := (abs_le.mp habs).1
     dsimp [kappa]
     linarith
-  -- The explicit shift makes the mass-floor estimate control both terms of the H¹ norm.
   have hlower : ∀ w : W1p0 mu Omega 2,
       lam / 2 * ‖w‖ ^ 2 ≤
         energyFormH1 a b (fun x => c x + kappa)
           (w : W1p mu Omega 2) (w : W1p mu Omega 2) := by
     intro w
-    have hg :
-        lam / 2 * ‖W1p.gradient (w : W1p mu Omega 2)‖ ^ 2 +
-            (muFloor - beta ^ 2 / (2 * lam)) *
-              ‖W1p.value (w : W1p mu Omega 2)‖ ^ 2
-          ≤ energyFormH1 a b (fun x => c x + kappa)
-              (w : W1p mu Omega 2) (w : W1p mu Omega 2) := by
-      have hmem : ∀ᵐ x ∂mu.restrict (Omega : Set (EuclideanSpace ℝ ι)),
-          x ∈ (Omega : Set (EuclideanSpace ℝ ι)) :=
-        ae_restrict_mem Omega.isOpen.measurableSet
-      have hgrad := integrable_norm_jetField_snd_sq (w : W1p mu Omega 2)
-      have hval := integrable_jetField_fst_sq (w : W1p mu Omega 2)
-      have hlowerIntegrable : Integrable
-          (fun x => lam / 2 * ‖(jetField (w : W1p mu Omega 2) x).2‖ ^ 2 +
-            (muFloor - beta ^ 2 / (2 * lam)) *
-              (jetField (w : W1p mu Omega 2) x).1 ^ 2)
-          (mu.restrict Omega) :=
-        (hgrad.const_mul _).add (hval.const_mul _)
-      have key := UniformlyEllipticOn.garding_energyFormIntegral_self_of_mass_lower_bound_on
-        (μ := mu.restrict Omega) (U := jetField (w : W1p mu Omega 2)) h hmem
-        (hmem.mono hb_bound) (hmem.mono hc_shift_lower) hlowerIntegrable
-        (PDE.integrable_energyIntegrand_jetField hcoeffShift
-          (w : W1p mu Omega 2) (w : W1p mu Omega 2))
-      rw [energyFormH1_def]
-      rw [energyFormIntegral_def] at key
-      refine le_trans (le_of_eq ?_) key
-      rw [integral_add (hgrad.const_mul _) (hval.const_mul _), integral_const_mul,
-        integral_const_mul, integral_norm_jetField_snd_sq_eq_norm_gradient_sq,
-        integral_jetField_fst_sq_eq_norm_value_sq]
-    -- `W1p0` inherits its norm from `W1p`; expose it for the graph-norm identity.
+    have hg := garding_energyFormH1_self_of_mass_lower_bound
+      h ha hb hc_shift_meas hb_bound hc_shift_bound hc_shift_lower
+      (w : W1p mu Omega 2)
     change lam / 2 * ‖(w : W1p mu Omega 2)‖ ^ 2 ≤ _
     rw [W1p.norm_sq_eq_norm_value_sq_add_norm_gradient_sq]
     have hcoeffEq : muFloor - beta ^ 2 / (2 * lam) = lam / 2 := by
@@ -222,7 +201,6 @@ theorem fredholmAlternative_isWeakSolutionDirichlet_of_bounds
     dsimp [K]
     exact mem_ker_one_sub_smul_dirichletMassOperator_iff_isWeakSolutionDirichlet
       kappa hcoeff hcoeffShift hcoercive u
-  -- Transport the two branches of the mass-shift theorem back to the original coefficient.
   rcases fredholmAlternative_isWeakSolutionDirichletMassShift
       hcoeffShift hcoercive hOmega kappa with hkernel | hsolvable
   · left
