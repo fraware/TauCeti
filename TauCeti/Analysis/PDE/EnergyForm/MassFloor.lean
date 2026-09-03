@@ -42,15 +42,24 @@ variable {ι : Type*} [Fintype ι] [DecidableEq ι]
 
 namespace UniformlyEllipticOn
 
-/-- **Gårding's inequality with a positive mass floor on `H¹(Ω)`.** If the mass coefficient is
-bounded below by `μ`, then
+/-- Uniform ellipticity is independent of the chosen decidable equality on the finite coordinate
+index. This aligns the ambient hypothesis with the canonical choice used by the integrated
+energy-form layer. -/
+private theorem withClassicalDecEq
+    (h : UniformlyEllipticOn (Omega : Set (EuclideanSpace ℝ ι)) a lam Lam) :
+    @UniformlyEllipticOn (EuclideanSpace ℝ ι) ι _ (Classical.decEq ι)
+      (Omega : Set (EuclideanSpace ℝ ι)) a lam Lam := by
+  rwa [Subsingleton.elim (Classical.decEq ι) ‹DecidableEq ι›]
+
+/-- **Gårding's inequality with a mass floor on `H¹(Ω)`.** If the mass coefficient is bounded
+below by `μ`, then
 
 `(λ/2)‖∇u‖² + (μ - β²/(2λ))‖u‖² ≤ a(u,u)`.
 
 This is the Sobolev-function form of
 `TauCeti.PDE.UniformlyEllipticOn.garding_energyFormIntegral_self_of_mass_lower_bound_on`.
-Unlike the nonnegative-mass Gårding bound, it retains the positive contribution of the mass floor
-instead of discarding it. -/
+It retains the contribution of the mass floor instead of discarding it as the nonnegative-mass
+Gårding bound does. -/
 theorem garding_energyFormH1_self_of_mass_lower_bound
     (h : UniformlyEllipticOn (Omega : Set (EuclideanSpace ℝ ι)) a lam Lam)
     (ha : AEStronglyMeasurable a (mu.restrict Omega))
@@ -74,7 +83,7 @@ theorem garding_energyFormH1_self_of_mass_lower_bound
       (mu.restrict Omega) :=
     (hgrad.const_mul _).add (hval.const_mul _)
   have key := garding_energyFormIntegral_self_of_mass_lower_bound_on
-    (μ := mu.restrict Omega) (U := jetField u) h hmem
+    (μ := mu.restrict Omega) (U := jetField u) h.withClassicalDecEq hmem
     (hmem.mono hb_bound) (hmem.mono hc_lower) hlower
     (integrable_energyIntegrand_jetField h ha hb hc hb_bound hc_bound u u)
   rw [energyFormH1_def]
