@@ -91,6 +91,7 @@ private theorem mem_ker_one_sub_smul_dirichletMassOperator_iff_isWeakSolutionDir
   rw [LinearMap.mem_ker]
   have hzeroSol :
       IsWeakSolutionDirichlet a b (fun x => c x + kappa) 0 (0 : W1p0 mu Omega 2) := by
+    rw [isWeakSolutionDirichlet_iff]
     intro v
     simp
   have hzero : weakSolutionDirichlet hcoeffShift hcoercive 0 = 0 :=
