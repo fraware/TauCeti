@@ -94,6 +94,10 @@ private theorem mem_ker_one_sub_smul_dirichletMassOperator_iff_isWeakSolutionDir
       IsWeakSolutionDirichlet a b (fun x => c x + kappa) 0 (0 : W1p0 mu Omega 2) := by
     rw [isWeakSolutionDirichlet_iff]
     intro v
+    change energyFormH1 a b (fun x => c x + kappa) (0 : W1p mu Omega 2)
+        (v : W1p mu Omega 2) =
+      ∫ x in Omega, (0 : Lp ℝ 2 (mu.restrict Omega)) x *
+        W1p.value (v : W1p mu Omega 2) x ∂mu
     rw [energyFormH1_zero_left]
     symm
     apply integral_eq_zero_of_ae
